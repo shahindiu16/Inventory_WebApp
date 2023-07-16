@@ -1,0 +1,409 @@
+﻿@model INV.BO.INV_Inventories
+
+@{
+    Layout = null;
+    //@using INV.COMMON
+    @using Microsoft.AspNetCore.Http
+}
+
+<div class="col-md-12">
+    <div class="card card-outline card-info">
+        <div class="card-header">
+            
+            <div class="card-tools">
+                <div class="row">
+                  
+                    <div class="col-sm-4">
+                        <select class="form-control form-control-sm" id="CustomerId" asp-for="CustomerId" asp-items="@(new SelectList(ViewBag.CustomerList, "CustomerId", "Name"))" >
+                        <option value="0">--Customer--</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="view-all">
+            <div class="invoice p-3 mb-3">
+                <!-- Table row -->
+                <div class="row">
+                    <div class="col-12 table-responsive">
+                        <table class="table table-bordered table-hover table-sm">
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>Product</th>
+                                    <th>Rate</th>
+                                    <th>Quantity</th>
+                                    <th>Total Amount</th>
+                                    <th>Discount</th>
+                                    <th>Net Amount</th>
+
+                                    <th></th>
+                                </tr>
+
+                            </thead>
+                            <tbody class="detail">
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th></th>
+                                    <th></th>
+                                    <th></th>
+                                    <th style="text-align:center;" class="totalQty">0</th>
+                                    <th></th>
+                                    <th></th>
+                                    <th style="text-align:center;" class="totalAmt">0<b></b></th>
+                                    <th><input type="button" value="+" id="add" class="btn-success btn-sm add"></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                    </div>
+                    <!-- /.col -->
+                </div>
+                <!-- /.row -->
+
+                <div class="row">
+                    <!-- accepted payments column -->
+                    <div class="col-6">
+                    </div>
+                    <!-- /.col -->
+                    <div class="col-6">
+                        @*  <p class="lead">Amount Due 2/22/2014</p>*@
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm">
+                                <tr>
+                                    <td style="width:50%">Subtotal:</td>
+                                    <td class="totalAmt"></td>
+                                    @*<td class="hPTotalAmt"></td>*@
+                                </tr>
+                                <tr>
+                                    <td>Discount applied:</td>
+                                    <td class="totalDiscount"></td>
+                                </tr>
+                                <tr>
+                                    <th>Paid Amount:</th>
+                                    @*<th class="grandTotal"></th>*@
+                                    @*<th><input class="grandTotal"></th>*@
+                                    @*<th><input type="number" class="paidAmount"></th>*@
+                                    <th><input type="number" id="paidAmount" class="form-control form-control-sm" placeholder="Paid Amount" step="0.01"></th>
+
+
+                                </tr> 
+                                <tr>
+                                    <th>Due Amount:</th>
+                                    <th class="dueAmount"></th>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- /.col -->
+                </div>
+                <!-- /.row -->
+                <!-- this row will not appear when printing -->
+                <div class="row no-print">
+                    <div class="col-12">
+                        <button type="button" id="btnSubmit" class="btn btn-success float-right">
+                             Submit
+                        </button>
+                        <button type="button" class="btn btn-primary float-right" data-dismiss="modal" style="margin-right: 5px;">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script type="text/javascript">
+    //$('#dueDate').val(new Date().toJSON().slice(0, 10));
+    addnewrow();
+    getItemList();
+    $(function () {
+        $('#add').click(function () {
+            addnewrow();
+            getItemList();
+        });
+        $('body').delegate('.remove', 'click', function () {
+            $(this).parent().parent().remove();
+            total();
+        });
+
+        $("#customerId").change(function () {
+            getCustomerAddress();
+        });
+
+        $('body').delegate('.quantity,.price,.discount', 'keyup', function () {
+            var tr = $(this).parent().parent();
+            var qty = tr.find('.quantity').val();
+            var price = tr.find('.price').val();
+            var hPurchasePrice = tr.find('.hPurchasePrice').val();
+            var dis = tr.find('.discount').val();
+            //var pAmt = tr.find('.paidAmount').val();
+
+            $(".form-control-sm").focus(function () {
+                $tb = $(this);
+                if ($.trim($tb.val()) == 0) {
+                    $tb.val("");
+                }
+            });
+            $(".form-control-sm").keypress(function (e) {
+                if (e.which > 31 && (e.which < 48 || e.which > 57))
+                    return false;
+                return true;
+            });
+            $(".form-control-sm").blur(function () {
+                $tb = $(this);
+                if ($.trim($tb.val()) == "") {
+                    $tb.val(0);
+                }
+                if (this.value.match(/[^0-9 ]/g)) {
+                    this.value = this.value.replace(/[^0-9 ]/g, '');
+                }
+            });
+
+            //var amt = (qty * price) - (qty * price * dis) / 100; //%
+            var amt = (qty * price) - dis; // AMOUNT
+            var tamt = (qty * price); // Total AMOUNT
+            var hPamt = (qty * hPurchasePrice); // AMOUNT
+            //var dueAmt = (amt - pAmt); // AMOUNT
+            //alert(amt);
+            tr.find('.amount').val(amt.toFixed(2));
+            tr.find('.totalAmount').val(tamt.toFixed(2));
+            //tr.find('.dueAmount').val(dueAmt.toFixed(2));
+            tr.find('.hPAmount').val(hPamt.toFixed(2));
+            total();
+        });
+    });
+
+    function total() {
+        var totalAmt = 0;
+        var totalPAmt = 0;
+        var totalQty = 0;
+        $('.amount').each(function (i, e) {
+            var amt = $(this).val() - 0;
+            totalAmt += amt;
+        });
+        $('.hPAmount').each(function (i, e) {
+            var pAmt = $(this).val() - 0;
+            totalPAmt += pAmt;
+        });
+        $('.quantity').each(function (i, e) {
+            var qty = $(this).val() - 0;
+            totalQty += qty;
+        });
+        $('.totalQty').html(totalQty.toFixed(2));
+        $('.totalAmt').html(totalAmt.toFixed(2));
+        $('.hPTotalAmt').html(totalPAmt.toFixed(2));
+
+        var totalDiscount = 0;
+        $('.discount').each(function (i, e) {
+            var amt = $(this).val() - 0;
+            totalDiscount += amt;
+        });
+        $('.totalDiscount').html(totalDiscount.toFixed(2));
+        $('.grandTotal').html((totalAmt).toFixed(2));
+
+    }
+    function calculateDueAmount() {
+        var totalAmt = parseFloat($(".totalAmt").html());
+        var paidAmount = parseFloat($("#paidAmount").val());
+        // Calculate the due amount
+        var dueAmount = totalAmt - paidAmount;
+        // Set the due amount value
+        //$(".dueAmount").val(dueAmount);
+        $('.dueAmount').html(dueAmount.toFixed(2));
+    }
+
+    $(document).ready(function () {
+        calculateDueAmount();
+
+        // Attach an event listener to the "paidAmount" input
+        $("#paidAmount").change(function () {
+            // Calculate the due amount
+            calculateDueAmount();
+        });
+    });
+    function addnewrow() {
+        var n = ($('.detail tr').length - 0) + 1;
+        var tr = '<tr>' +
+            '<td class="no" name="record">' + n + '</td>' +
+            '<td><select name="itemId[]"  class="form-control form-control-sm" id="itemId+"' + n + '"" style="max-width: 250px; text-overflow: ellipsis;" required></select></td>' +
+            //'<td><input type="text" value="0" disabled="disabled" class="form-control form-control-sm unit" name="unit[]"></td>' +
+            '<td><input type="text" value="0" class="form-control form-control-sm price" name="price[]"><input type="hidden" value="0" class="form-control form-control-sm hPurchasePrice" name="hPurchasePrice[]"></td>' +
+            '<td><input type="text" value="0" class="form-control form-control-sm quantity" name="quantity[]"></td>' +
+            //'<td><input type="text" value="0" class="form-control form-control-sm price" name="price[]"></td>' +
+
+            '<td><input type="text" value="0" class="form-control form-control-sm totalAmount" name="totalAmount[]"><input type="hidden" value="0" class="form-control form-control-sm hPAmount" name="hPAmount[]"></td>' +
+            '<td><input type="text" value="0" class="form-control form-control-sm discount" name="discount[]"></td>' +
+            //'<td><input type="text" value="0" class="form-control form-control-sm amount" name="amount[]"></td>' +
+            '<td><input type="text" value="0" class="form-control form-control-sm amount" name="amount[]"><input type="hidden" value="0" class="form-control form-control-sm hPAmount" name="hPAmount[]"></td>' +
+
+            '<td><a href="#" class="btn btn-danger btn-sm remove">-</td>' +
+            '</tr>';
+        $('.detail').append(tr);
+    }
+
+
+
+    $(function () {
+        var items = "";
+        $.getJSON("@Url.Action("GetItemList", "Product")", function (data) {
+            $.each(data, function (index, item) {
+                items += "<option value='" + item.itemId + "'>" + item.itemName + "</option>";
+            });
+            $("#itemId").html(items);
+        });
+    });
+
+    function getItemList() {
+        $("#itemId").empty();
+        $.ajax({
+            type: "GET",
+            url: '@Url.Action("GetItemList", "Product")',
+            contentType: "application/json; charset=utf-8",
+            success: function (data) {
+                $("[id*=itemId]").append('<option value=' + 0 + '>' + "--Select--" + '</option>');
+                $.each(data, function (key, value) {
+                    $("[id*=itemId]").append('<option value=' + value.productId + '>' + value.name + '</option>');
+                })
+            }
+        })
+    }
+
+    function getCustomerAddress() {
+        var customerId = $("#customerId").val();
+        $.ajax({
+            type: "GET",
+            url: '@Url.Action("GetCustomerAddresByCustomerId", "Layout")',
+            contentType: "application/json; charset=utf-8",
+            data: { 'cusId': customerId },
+            success: OnSuccess,
+            failure: function (response) {
+                console.log(response);
+            },
+            error: function (response) {
+                console.log(response);
+            }
+        })
+    }
+
+    function OnSuccess(response) {
+        var obj = jQuery.parseJSON(response);
+        $('#cusName').html(obj.CustomerName);
+        $('#cusAddress').html(obj.Address);
+        $('#cusEmail').html(obj.EmailAddress);
+        $('#cusMobile').html(obj.ContactNo);
+        $('#shippingHiddenId').val(obj.ShippingAddressId);
+
+    }
+
+    $('#btnSubmit').click(function () {
+        var itemList = new Array();
+        var customerId = $("#customerId").val();
+        var totalAmmount = $(".totalAmt").html();
+        var hPTotalAmt = $(".hPTotalAmt").html();
+        var totalQuantity = $('.totalQty').html();
+        var shippingCost = $('.shippingCost').html();
+        var totalDiscount = $('.totalDiscount').html();
+        var grandTotal = $('.grandTotal').html();
+        var dueDate = $("#dueDate").val();
+
+        var shipingAddressId = $("#shippingHiddenId").val();
+        var error = '';
+
+        if (customerId == "0") {
+            toastr.warning('Please select a customer')
+            return false;
+        }
+
+        var count = 1;
+        $(".detail").find('.no').each(function () {
+            var itemId = parseFloat($(this).closest('tr').find('td').find('select[id*=itemId]').val());
+            var quantity = parseFloat($(this).closest('tr').find('td').find('input[class*=quantity]').val());
+            var price = parseFloat($(this).closest('tr').find('td').find('input[class*=price]').val());
+            var discount = parseFloat($(this).closest('tr').find('td').find('input[class*=discount]').val());
+            var amount = parseFloat($(this).closest('tr').find('td').find('input[class*=amount]').val());
+
+            if (itemId == 0) {
+                error += "Please select an item at " + count + " Row";
+                toastr.warning(error);
+                return false;
+            }
+            if (quantity == 0) {
+                error += "Please enter quantiry at " + count + " Row";
+                toastr.warning(error);
+                return false;
+            }
+            count = count + 1;
+
+            var model = { ItemId: itemId, Quantity: quantity, UnitPrice: price, Discount: discount, SubTotal: amount }
+            itemList.push(model);
+
+        });
+        if (error == '') {
+            var objData = { CustomerId: parseFloat(customerId), ShippingAddressId: parseFloat(shipingAddressId), ShippingCost: parseFloat(shippingCost), TotalQuantity: parseFloat(totalQuantity), TotalAmount: parseFloat(totalAmmount), TotalPurchaseAmount: parseFloat(hPTotalAmt), TotalDiscount: parseFloat(totalDiscount), GrandTotal: parseFloat(grandTotal), DueDate: dueDate, InvoiceDetailList: itemList }
+            var obj = JSON.stringify(objData);
+            $.ajax({
+                type: "POST",
+                url: "@Url.Action("Add", "EInvoice")",
+                contentType: "application/json; charset=utf-8",
+                data: obj,
+                datatype: "json",
+                success: function (res) {
+                    if (res.isValid) {
+                        $('#form-modal-xl .modal-body').html('');
+                        $('#form-modal-xl .modal-title').html('');
+                        $('#form-modal-xl').modal('hide');
+                        $('body').removeClass('modal-open');
+                        $('.modal-backdrop').remove();
+
+                        toastr.success(res.message);
+                        loadDataList();
+                    } else {
+
+                        $('#form-modal-xl .modal-body').html('');
+                        $('#form-modal-xl .modal-title').html('');
+                        $('#form-modal-xl').modal('hide');
+                        $('body').removeClass('modal-open');
+                        $('.modal-backdrop').remove();
+                        toastr.error(res.message);
+                        loadDataList();
+                    }
+                },
+                error: function (err) {
+                    console.log(err)
+                }
+            });
+        }
+    });
+
+
+</script>
+
+@*<script>
+    function calculateDueAmount() {
+        var totalAmt = parseFloat($(".totalAmt").html());
+        var paidAmount = parseFloat($("#paidAmount").val());
+        //alert(paidAmount);
+        // Calculate the due amount
+        var dueAmount = totalAmt - paidAmount;
+
+        // Set the due amount value
+        $(".dueAmount").val(dueAmount);
+    }
+
+    $(document).ready(function () {
+        // Calculate the due amount when the page loads
+        calculateDueAmount();
+
+        // Attach an event listener to the "paidAmount" input
+        $("#paidAmount").change(function () {
+            // Calculate the due amount
+            calculateDueAmount();
+        });
+    });
+</script>*@
+

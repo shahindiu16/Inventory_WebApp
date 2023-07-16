@@ -1,0 +1,32 @@
+﻿
+@{
+    ViewData["Title"] = "Index";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<div class="content-wrapper">
+    <br />
+    <section class="content">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card card-outline card-info">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-list"></i>
+                            <small> List</small>
+                        </h3>
+                       @* <div class="card-tools">
+                            <button type="button" class="btn btn-tool btn-sm" title="Reload">
+                                <a href="@Url.Action("Index","Inventory")" class="btn btn-default btn-xs"><i class="fas fa-sync-alt"></i></a>
+                            </button>
+                        </div>*@
+                    </div>
+                    <div id="view-all">
+                        <partial name="List" />
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
